@@ -80,30 +80,39 @@ func (in Snapshots) Previous(ignoreTests bool) *Snapshot {
 	return nil
 }
 
-// Truncate removes all Snapshots up to the Previous deployed Snapshot.
-// If there is no previous-deployed Snapshot, the most recent 5 Snapshots are
-// retained.
+// Truncate retains up to defaultMaxHistory (5) most recent Snapshots for
+// observability, while ensuring the Previous deployed/superseded Snapshot
+// is always included (for rollback safety). If the Previous deployed
+// Snapshot is beyond the defaultMaxHistory window, the window is extended
+// to include it.
 func (in *Snapshots) Truncate(ignoreTests bool) {
 	if in.Len() < 2 {
 		return
 	}
 
 	in.SortByVersion()
+
+	// Find the index of the previous deployed/superseded snapshot.
+	prevIdx := -1
 	for i := range (*in)[1:] {
 		s := (*in)[i+1]
 		if s.Status == snapshotStatusDeployed || s.Status == snapshotStatusSuperseded {
 			if ignoreTests || !s.HasTestInPhase(snapshotTestPhaseFailed) {
-				*in = (*in)[:i+2]
-				return
+				prevIdx = i + 1
+				break
 			}
 		}
 	}
 
-	if in.Len() > defaultMaxHistory {
-		// If none of the Snapshots are deployed or superseded, and there
-		// are more than the defaultMaxHistory, truncate to the most recent
-		// Snapshots.
-		*in = (*in)[:defaultMaxHistory]
+	// Determine the truncation point: keep up to defaultMaxHistory
+	// entries, but extend the window if the previous deployed snapshot
+	// is beyond it.
+	cutoff := defaultMaxHistory
+	if prevIdx >= 0 && prevIdx+1 > cutoff {
+		cutoff = prevIdx + 1
+	}
+	if in.Len() > cutoff {
+		*in = (*in)[:cutoff]
 	}
 }
 

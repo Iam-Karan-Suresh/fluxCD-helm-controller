@@ -175,7 +175,7 @@ func TestSnapshots_Truncate(t *testing.T) {
 		want        Snapshots
 	}{
 		{
-			name: "keeps previous snapshot",
+			name: "keeps up to defaultMaxHistory with previous snapshot",
 			in: Snapshots{
 				{Version: 1, Status: "superseded"},
 				{Version: 3, Status: "failed"},
@@ -184,6 +184,46 @@ func TestSnapshots_Truncate(t *testing.T) {
 			},
 			want: Snapshots{
 				{Version: 4, Status: "deployed"},
+				{Version: 3, Status: "failed"},
+				{Version: 2, Status: "superseded"},
+				{Version: 1, Status: "superseded"},
+			},
+		},
+		{
+			name: "truncates to defaultMaxHistory when more than five",
+			in: Snapshots{
+				{Version: 7, Status: "deployed"},
+				{Version: 6, Status: "superseded"},
+				{Version: 5, Status: "superseded"},
+				{Version: 4, Status: "superseded"},
+				{Version: 3, Status: "superseded"},
+				{Version: 2, Status: "superseded"},
+				{Version: 1, Status: "superseded"},
+			},
+			want: Snapshots{
+				{Version: 7, Status: "deployed"},
+				{Version: 6, Status: "superseded"},
+				{Version: 5, Status: "superseded"},
+				{Version: 4, Status: "superseded"},
+				{Version: 3, Status: "superseded"},
+			},
+		},
+		{
+			name: "extends window when previous deployed is beyond defaultMaxHistory",
+			in: Snapshots{
+				{Version: 7, Status: "deployed"},
+				{Version: 6, Status: "failed"},
+				{Version: 5, Status: "failed"},
+				{Version: 4, Status: "failed"},
+				{Version: 3, Status: "failed"},
+				{Version: 2, Status: "superseded"},
+				{Version: 1, Status: "superseded"},
+			},
+			want: Snapshots{
+				{Version: 7, Status: "deployed"},
+				{Version: 6, Status: "failed"},
+				{Version: 5, Status: "failed"},
+				{Version: 4, Status: "failed"},
 				{Version: 3, Status: "failed"},
 				{Version: 2, Status: "superseded"},
 			},
@@ -256,6 +296,18 @@ func TestSnapshots_Truncate(t *testing.T) {
 					"upgrade-test-fail-podinfo-fault-test-tiz9x": {Phase: "Failed"},
 					"upgrade-test-fail-podinfo-grpc-test-gddcw":  {},
 				}},
+				{Version: 2, Status: "superseded", TestHooks: &map[string]*TestHookStatus{
+					"upgrade-test-fail-podinfo-grpc-test-h0tc2": {
+						Phase: "Succeeded",
+					},
+					"upgrade-test-fail-podinfo-jwt-test-vzusa": {
+						Phase: "Succeeded",
+					},
+					"upgrade-test-fail-podinfo-service-test-b647e": {
+						Phase: "Succeeded",
+					},
+				}},
+				{Version: 1, Status: "superseded"},
 			},
 		},
 		{
